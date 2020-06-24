@@ -109,6 +109,7 @@
             type: "GET",
             //YOUR TURN: Replace with csv export link
             url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTGBcx3ZJJHqhc9FnATHnOIZ-DM0wetwVaaGs1D7qiVjS4fdrWXVs0VWKjr5FgOb5r0S20UbDoXyC0Z/pub?gid=0&single=true&output=csv',
+            headers: {  'Access-Control-Allow-Origin': 'https://docs.google.com/spreadsheets' },
             dataType: "text",
             success: function(csvData) {
               makeGeoJSON(csvData);
