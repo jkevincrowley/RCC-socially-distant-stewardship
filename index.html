@@ -13,7 +13,7 @@
   <script src='https://npmcdn.com/csv2geojson@latest/csv2geojson.js'></script>
   <script src='https://npmcdn.com/@turf/turf/turf.min.js'></script>
 
-<style>
+  <style>
     body {
       margin: 0;
       padding: 0;
@@ -77,6 +77,7 @@
     }
   </style>
 </head>
+
 <body>
 
   <div id="map"></div>
@@ -86,9 +87,8 @@
         url.slice(8, 22) === "api.mapbox.com" ||
         url.slice(10, 26) === "tiles.mapbox.com";
       return {
-        url: isMapboxRequest
-        ? url.replace("?", "?pluginName=sheetMapper&")
-        : url
+        url: isMapboxRequest ?
+          url.replace("?", "?pluginName=sheetMapper&") : url
       };
     };
 
@@ -102,168 +102,212 @@
       transformRequest: transformRequest
     });
 
-    
+    var sheet1 = {}
+    var sheet2 = {}
 
     $(document).ready(function() {
-          $.ajax({
-            type: "GET",
-            //YOUR TURN: Replace with csv export link
-            url: 'https://docs.google.com/spreadsheets/d/1gW0NKHIUy4wNn-Y99lTSlm--lSYBOPlJ3VG_2Oe2o2c/gviz/tq?tqx=out:csv&sheet=sheet_1',
-            dataType: "text",
-            success: function(csvData) {
-              makeGeoJSON(csvData);
-            }
+      $.ajax({
+        type: "GET",
+        //YOUR TURN: Replace with csv export link
+        url: 'https://docs.google.com/spreadsheets/d/1gW0NKHIUy4wNn-Y99lTSlm--lSYBOPlJ3VG_2Oe2o2c/gviz/tq?tqx=out:csv&sheet=sheet_1',
+        dataType: "text",
+        success: function(csvData) {
+          makeGeoJSON(csvData);
+        }
+      });
+
+      function makeGeoJSON(csvData) {
+        csv2geojson.csv2geojson(csvData, {
+            latfield: 'Latitude',
+            lonfield: 'Longitude',
+            delimiter: ','
+          },
+          function(err, data) {
+            sheet1 = data
           });
+      };
+    });
+    //setup second sheet as source for popup window
+    $(document).ready(function() {
+      $.ajax({
+        type: "GET",
+        url: 'https://docs.google.com/spreadsheets/d/1gW0NKHIUy4wNn-Y99lTSlm--lSYBOPlJ3VG_2Oe2o2c/gviz/tq?tqx=out:csv&sheet=PivotTable1',
+        dataType: "text",
+        success: function(csvData) {
+          makeGeoJSON(csvData);
+        }
+      });​​
+      function makeGeoJSON(csvData) {
+        csv2geojson.csv2geojson(csvData, {
+          latfield: 'Latitude',
+          lonfield: 'Longitude',
+          delimiter: ','
+        }, function(err, data) {
+          sheet2 = data
+          console.log(data)
+        });
+      };
+    });
 
+    map.on('load', function() {
 
-          function makeGeoJSON(csvData) {
-            csv2geojson.csv2geojson(csvData, {
-                  latfield: 'Latitude',
-                  lonfield: 'Longitude',
-                  delimiter: ','
-                }, function(err, data) {
-                  map.on('load', function() {
+      //Add the the layer to the map
+      /* map.addLayer({
+         'id': 'csvData',
+         'type': 'circle',
+         'source': {
+           'type': 'geojson',
+           'data': data
+         },
+         'paint': {
+           'circle-radius': 5,
+           'circle-color': "purple"
+         }
+       }); */
+      map.addSource('clusterSource', {
+        type: 'geojson',
+        data: sheet1,
+        cluster: true,
+        clusterMaxZoom: 14, // Max zoom to cluster points on
+        clusterRadius: 50 // Radius of each cluster when clustering points (defaults to 50)
+      });
+      
+      map.addSource('pointSource', {
+        type: 'geojson',
+        data: sheet2,
+      });
+      
+      map.addLayer({
+        id: 'popup-points',
+        type: 'circle',
+        source: 'pointSource',
+        filter: ['!', ['has', 'point_count']],
 
-                        //Add the the layer to the map
-                       /* map.addLayer({
-                          'id': 'csvData',
-                          'type': 'circle',
-                          'source': {
-                            'type': 'geojson',
-                            'data': data
-                          },
-                          'paint': {
-                            'circle-radius': 5,
-                            'circle-color': "purple"
-                          }
-                        }); */
-map.addSource('csvDataSource', {
-              type: 'geojson',
-              data: data,
-              cluster: true,
-              clusterMaxZoom: 14, // Max zoom to cluster points on
-              clusterRadius: 50 // Radius of each cluster when clustering points (defaults to 50)
-            });
+        paint: {
+          'circle-color': '#asd245',
+          'circle-radius': 8,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#fff',
+          'circle-opacity': 0
+        }
+        
+      });
 
-            map.addLayer({
-              id: 'clusters',
-              type: 'circle',
-              source: 'csvDataSource',
-              filter: ['has', 'point_count'],
-              paint: {
-                // Use step expressions (https://docs.mapbox.com/mapbox-gl-js/style-spec/#expressions-step)
-                // with three steps to implement three types of circles:
-                //   * Blue, 20px circles when point count is less than 100
-                //   * Yellow, 30px circles when point count is between 100 and 750
-                //   * Pink, 40px circles when point count is greater than or equal to 750
-                'circle-color': [
-                  'step',
-                  ['get', 'point_count'],
-                  '#51bbd6',
-                  100,
-                  '#f1f075',
-                  750,
-                  '#f28cb1'
-                ],
-                'circle-radius': [
-                  'step',
-                  ['get', 'point_count'],
-                  20,
-                  100,
-                  30,
-                  750,
-                  40
-                ]
-              }
-            });
-            map.addLayer({
-              id: 'cluster-count',
-              type: 'symbol',
-              source: 'csvDataSource',
-              filter: ['has', 'point_count'],
-              layout: {
-                'text-field': '{point_count_abbreviated}',
-                'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-                'text-size': 12
-              }
-            });
+      map.addLayer({
+        id: 'clusters',
+        type: 'circle',
+        source: 'clusterSource',
+        filter: ['has', 'point_count'],
+        paint: {
+          // Use step expressions (https://docs.mapbox.com/mapbox-gl-js/style-spec/#expressions-step)
+          // with three steps to implement three types of circles:
+          //   * Blue, 20px circles when point count is less than 100
+          //   * Yellow, 30px circles when point count is between 100 and 750
+          //   * Pink, 40px circles when point count is greater than or equal to 750
+          'circle-color': [
+            'step',
+            ['get', 'point_count'],
+            '#51bbd6',
+            100,
+            '#f1f075',
+            750,
+            '#f28cb1'
+          ],
+          'circle-radius': [
+            'step',
+            ['get', 'point_count'],
+            20,
+            100,
+            30,
+            750,
+            40
+          ]
+        }
+      });
+      map.addLayer({
+        id: 'cluster-count',
+        type: 'symbol',
+        source: 'clusterSource',
+        filter: ['has', 'point_count'],
+        layout: {
+          'text-field': '{point_count_abbreviated}',
+          'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+          'text-size': 12
+        }
+      });
 
-            map.addLayer({
-              id: 'unclustered-point',
-              type: 'circle',
-              source: 'csvDataSource',
-              filter: ['!', ['has', 'point_count']],
-              paint: {
-                'circle-color': '#11b4da',
-                'circle-radius': 4,
-                'circle-stroke-width': 1,
-                'circle-stroke-color': '#fff'
-              }
-            });
+      map.addLayer({
+        id: 'unclustered-point',
+        type: 'circle',
+        source: 'clusterSource',
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-color': '#11b4da',
+          'circle-radius': 4,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#fff'
+        }
+      });
+    });
 
-            // inspect a cluster on click
-            map.on('click', 'clusters', function(e) {
-              var features = map.queryRenderedFeatures(e.point, {
-                layers: ['clusters']
-              });
-              var clusterId = features[0].properties.cluster_id;
-              map.getSource('csvDataSource').getClusterExpansionZoom(
-                clusterId,
-                function(err, zoom) {
-                  if (err) return;
+    // inspect a cluster on click
+    map.on('click', 'clusters', function(e) {
+      var features = map.queryRenderedFeatures(e.point, {
+        layers: ['clusters']
+      });
+      var clusterId = features[0].properties.cluster_id;
+      map.getSource('csvDataSource').getClusterExpansionZoom(
+        clusterId,
+        function(err, zoom) {
+          if (err) return;
 
-                  map.easeTo({
-                    center: features[0].geometry.coordinates,
-                    zoom: zoom
-                  });
-                }
-              );
-            });
+          map.easeTo({
+            center: features[0].geometry.coordinates,
+            zoom: zoom
+          });
+        }
+      );
+    });
 
-                        // When a click event occurs on a feature in the csvData layer, open a popup at the
-             // location of the feature, with description HTML from its properties.
-             map.on('click', 'unclustered-point', function (e) {
-               var coordinates = e.features[0].geometry.coordinates.slice();
+    // When a click event occurs on a feature in the csvData layer, open a popup at the
+    // location of the feature, with description HTML from its properties.
+    map.on('click', 'popup-points', function(e) {
+      var coordinates = e.features[0].geometry.coordinates.slice();
 
-               //set popup text
-               //You can adjust the values of the popup to match the headers of your CSV.
-               // For example: e.features[0].properties.Name is retrieving information from the field Name in the original CSV.
-               var description = `<h3>` + e.features[0].properties.Name + `</h3>` + `<h4>` + `<b>` + `Address: ` + `</b>` + e.features[0].properties.Address + `</h4>` + `<h4>` + `<b>` + `Phone: ` + `</b>` + e.features[0].properties.Phone + `</h4>`;
+      //set popup text
+      //You can adjust the values of the popup to match the headers of your CSV.
+      // For example: e.features[0].properties.Name is retrieving information from the field Name in the original CSV.
+      var description = `<h3>` + e.features[0].properties.Neighborhood + `</h3>` + `<h4>` + `<b>` + `Total Volunteers: ` + `</b>` + e.features[0].properties.SUMofNumberofPeople + `</h4>` + `<h4>` + `<b>` + `Total Volunteer Hours: ` + `</b>` + e.features[0].properties.SUMofTotalGroupHours + `</h4>` + `<h4>` + `<b>` + `Total Bags of Trash Collected: ` + `</b>` + e.features[0].properties.COUNTAofBagsofTrash + `</h4>`;
 
-               // Ensure that if the map is zoomed out such that multiple
-               // copies of the feature are visible, the popup appears
-               // over the copy being pointed to.
-               while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-                 coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
-               }
+      // Ensure that if the map is zoomed out such that multiple
+      // copies of the feature are visible, the popup appears
+      // over the copy being pointed to.
+      while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+        coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+      }
 
-               //add Popup to map
+      //add Popup to map
 
-               new mapboxgl.Popup()
-                 .setLngLat(coordinates)
-                 .setHTML(description)
-                 .addTo(map);
-             });
+      new mapboxgl.Popup()
+        .setLngLat(coordinates)
+        .setHTML(description)
+        .addTo(map);
+    });
 
-             // Change the cursor to a pointer when the mouse is over the places layer.
-             map.on('mouseenter', 'csvData', function () {
-               map.getCanvas().style.cursor = 'pointer';
-             });
+    // Change the cursor to a pointer when the mouse is over the places layer.
+    map.on('mouseenter', 'unclustered-point', function() {
+      map.getCanvas().style.cursor = 'pointer';
+    });
 
-             // Change it back to a pointer when it leaves.
-             map.on('mouseleave', 'places', function () {
-               map.getCanvas().style.cursor = '';
-             });
+    // Change it back to a pointer when it leaves.
+    map.on('mouseleave', 'unclustered-point', function() {
+      map.getCanvas().style.cursor = '';
+    });
 
-             var bbox = turf.bbox(data);
-             map.fitBounds(bbox, { padding: 50 });
-
-           });
-
-         });
-       };
-     });
-
+    var bbox = turf.bbox(data);
+    map.fitBounds(bbox, {
+      padding: 50
+    });
   </script>
 </body>
 
