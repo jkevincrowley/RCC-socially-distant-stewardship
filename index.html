@@ -127,6 +127,7 @@
           });
       };
     });
+    
     //setup second sheet as source for popup window
     $(document).ready(function() {
       $.ajax({
@@ -136,7 +137,7 @@
         success: function(csvData) {
           makeGeoJSON(csvData);
         }
-      });​​
+    });​​
       function makeGeoJSON(csvData) {
         csv2geojson.csv2geojson(csvData, {
           latfield: 'Latitude',
@@ -171,12 +172,12 @@
         clusterMaxZoom: 14, // Max zoom to cluster points on
         clusterRadius: 50 // Radius of each cluster when clustering points (defaults to 50)
       });
-      
+
       map.addSource('pointSource', {
         type: 'geojson',
         data: sheet2,
       });
-      
+
       map.addLayer({
         id: 'popup-points',
         type: 'circle',
@@ -190,7 +191,7 @@
           'circle-stroke-color': '#fff',
           'circle-opacity': 0
         }
-        
+
       });
 
       map.addLayer({
